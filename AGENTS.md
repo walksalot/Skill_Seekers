@@ -1,303 +1,191 @@
-# AGENTS.md - Skill Seekers
+# AGENTS.md — Skill Seekers
 
-Comprehensive reference for AI coding agents. Skill Seekers is a Python CLI tool (v3.6.0) that converts documentation sites, GitHub repos, PDFs, videos, notebooks, wikis, and more into AI-ready skills for 21+ LLM platforms and RAG pipelines.
+Single canonical rulebook for every AI agent (Codex natively; Claude Code via CLAUDE.md's
+`@AGENTS.md` import; QWEN.md stays a short pointer here). The two former rulebooks (a
+21.6 KB CLAUDE.md and a 13.8 KB AGENTS.md) carried contradictory versions and dispatch
+descriptions; this merge resolves them — the drift-guarded CLAUDE.md content won on every
+conflict, re-verified against the tree at merge time.
 
 ## Project Overview
 
-**Skill Seekers** is a universal preprocessing layer that transforms raw documentation and code into structured knowledge assets. It supports 17+ source types and exports to 21+ AI platforms including Claude, Gemini, OpenAI, LangChain, LlamaIndex, and various vector databases.
+**Skill Seekers** converts documentation from 18 source types into production-ready formats for 21+ AI platforms (LLM platforms, RAG frameworks, vector databases, AI coding assistants). Published on PyPI as `skill-seekers`.
 
-### Key Capabilities
-- **Source Types (17):** Documentation websites, GitHub repos, PDFs, Word docs, EPUBs, videos, local codebases, Jupyter notebooks, HTML, OpenAPI specs, AsciiDoc, PowerPoint, Confluence, Notion, RSS feeds, man pages, chat exports
-- **Export Targets (21):** Claude, Gemini, OpenAI, MiniMax, OpenCode, Kimi, DeepSeek, Qwen, OpenRouter, Together AI, Fireworks AI, Markdown, LangChain, LlamaIndex, Haystack, Weaviate, ChromaDB, FAISS, Qdrant, Pinecone
-- **MCP Server:** FastMCP-based Model Context Protocol server for AI assistant integration
+**Version:** source of truth is `src/skill_seekers/_version.py` (which reads `pyproject.toml`) — never pin a version number in prose; two pinned copies of it in the old rulebooks contradicted each other. | **Python:** 3.10+ | **Website:** https://skillseekersweb.com/
 
-## Setup
+**Architecture:** `docs/UML_ARCHITECTURE.md` (UML + module overview); StarUML at `docs/UML/skill_seekers.mdj`. Refactor state/history: `docs/UNIFICATION_PLAN.md` (Grand Unification — all 5 phases done).
+
+## Essential Commands
 
 ```bash
-# REQUIRED before running tests (src/ layout — tests hard-exit if package not installed)
+# REQUIRED before running tests or CLI (src/ layout — tests hard-exit if not installed)
 pip install -e .
 
-# With dev tools (pytest, ruff, mypy, coverage)
-pip install -e ".[dev]"
-
-# With specific LLM platform support
-pip install -e ".[gemini]"      # Google Gemini
-pip install -e ".[openai]"      # OpenAI ChatGPT
-pip install -e ".[all-llms]"    # All LLM platforms
-
-# With all optional dependencies (except video-full)
-pip install -e ".[all]"
-
-# Full video processing (heavy dependencies)
-pip install -e ".[video-full]"
-```
-
-Note: `tests/conftest.py` checks that `skill_seekers` is importable and calls `sys.exit(1)` if not. Always install in editable mode first.
-
-### Environment Variables
-
-Create a `.env` file or export these variables:
-```bash
-ANTHROPIC_API_KEY      # For Claude AI enhancement
-GOOGLE_API_KEY         # For Gemini support
-OPENAI_API_KEY         # For OpenAI support
-GITHUB_TOKEN           # For GitHub repo scraping (higher rate limits)
-```
-
-## Build / Test / Lint
-
-```bash
-# Full suite (never skip — all must pass)
+# Run all tests (NEVER skip - all must pass before commits)
 pytest tests/ -v
 
 # Fast iteration (skip slow, integration, E2E, network, MCP)
 pytest tests/ -m "not slow and not integration and not e2e and not network and not serial and not mcp_only" -q
 
-# Fast parallel (install pytest-xdist first)
+# Fast parallel (pytest-xdist)
 pytest tests/ -n auto --dist=loadfile -m "not slow and not integration and not e2e and not network and not serial and not mcp_only" -q
 
-# 3-phase runner script (recommended for local dev)
+# 3-phase runner (recommended local dev)
 bash scripts/run_tests_fast.sh
 
 # Single test
-pytest tests/test_scraper_features.py::test_detect_language -v
+pytest tests/test_scraper_features.py::test_detect_language -vv -s
 
-# Skip slow/integration
-pytest tests/ -v -m "not slow and not integration"
+# Code quality (must pass before push - matches CI; CI pins ruff==0.15.8)
+uvx ruff check src/ tests/
+uvx ruff format --check src/ tests/
+mypy src/skill_seekers  # continue-on-error in CI
 
-# With coverage
-pytest tests/ --cov=src/skill_seekers --cov-report=term
+# Auto-fix
+uvx ruff check --fix --unsafe-fixes src/ tests/
+uvx ruff format src/ tests/
 
-# Lint + format check (matches CI)
-ruff check src/ tests/
-ruff format --check src/ tests/
-
-# Type check (non-blocking — mypy is continue-on-error in CI)
-mypy src/skill_seekers --show-error-codes --pretty
+# Build & publish
+uv build
+uv publish
 ```
 
-**Pytest config:** `asyncio_mode = "auto"`, so `@pytest.mark.asyncio` is implicit. Test markers: `slow`, `integration`, `e2e`, `venv`, `bootstrap`, `benchmark`, `asyncio`, `serial`, `network`, `mcp_only`.
+**Pytest config:** `asyncio_mode = "auto"`. Markers: `slow`, `integration`, `e2e`, `venv`, `bootstrap`, `benchmark`, `asyncio`, `serial`, `network`, `mcp_only`.
 
-**CI note:** CI pins `ruff==0.15.8` (not the `>=0.14.13` dev dep). If formatting behaves differently locally, check the CI version.
+## CI
 
-**CI test phases:** Tests are split into 3 parallel jobs:
-- `test-fast` — 3386 unit tests with xdist across OS/Python matrix
-- `test-serial` — 69 serial/integration/E2E/network tests
-- `test-mcp` — 193 MCP tests (requires `[mcp]` extras)
-
-## Code Style
-
-### Formatting Rules (ruff — from pyproject.toml)
-- **Line length:** 100 characters
-- **Target Python:** 3.10+
-- **Enabled lint rules:** E, W, F, I, B, C4, UP, ARG, SIM
-- **Ignored rules:** E501 (line length handled by formatter), F541 (f-string style), ARG002 (unused method args for interface compliance), B007 (intentional unused loop vars), I001 (formatter handles imports), SIM114 (readability preference)
-
-### Imports
-- Sort with isort (via ruff); `skill_seekers` is first-party
-- Standard library → third-party → first-party, separated by blank lines
-- Use `from __future__ import annotations` only if needed for forward refs
-- Guard optional imports with try/except ImportError (see `adaptors/__init__.py` pattern):
-  ```python
-  try:
-      from .claude import ClaudeAdaptor
-      from .minimax import MiniMaxAdaptor
-  except ImportError:
-      ClaudeAdaptor = None
-      MiniMaxAdaptor = None
-  ```
-
-### Naming Conventions
-- **Files:** `snake_case.py` (e.g., `source_detector.py`, `config_validator.py`)
-- **Classes:** `PascalCase` (e.g., `SkillAdaptor`, `ClaudeAdaptor`, `SourceDetector`)
-- **Functions/methods:** `snake_case` (e.g., `get_adaptor()`, `detect_language()`)
-- **Constants:** `UPPER_CASE` (e.g., `ADAPTORS`, `DEFAULT_CHUNK_TOKENS`, `VALID_SOURCE_TYPES`)
-- **Private:** prefix with `_` (e.g., `_read_existing_content()`, `_validate_unified()`)
-
-### Type Hints
-- Gradual typing — add hints where practical, not enforced everywhere
-- Use modern syntax: `str | None` not `Optional[str]`, `list[str]` not `List[str]`
-- MyPy config: `disallow_untyped_defs = false`, `check_untyped_defs = true`, `ignore_missing_imports = true`
-- Tests are excluded from strict type checking (`disallow_untyped_defs = false`, `check_untyped_defs = false` for `tests.*`)
-
-### Docstrings
-- Module-level docstring on every file (triple-quoted, describes purpose)
-- Google-style docstrings for public functions/classes
-- Include `Args:`, `Returns:`, `Raises:` sections where useful
-
-### Error Handling
-- Use specific exceptions, never bare `except:`
-- Provide helpful error messages with context
-- Use `raise ValueError(...)` for invalid arguments, `raise RuntimeError(...)` for state errors
-- Guard optional dependency imports with try/except and give clear install instructions on failure
-- Chain exceptions with `raise ... from e` when wrapping
-
-### Suppressing Lint Warnings
-- Use inline `# noqa: XXXX` comments (e.g., `# noqa: F401` for re-exports, `# noqa: ARG001` for required but unused params)
-
-## Project Layout
-
-```
-src/skill_seekers/           # Main package (src/ layout)
-  cli/                       # CLI commands and entry points (100+ files)
-    adaptors/                # Platform adaptors (Strategy pattern, inherit SkillAdaptor)
-    arguments/               # CLI argument definitions (one per source type)
-    parsers/                 # Subcommand parsers (one per source type)
-    storage/                 # Cloud storage (inherit BaseStorageAdaptor)
-    main.py                  # Unified CLI entry point (COMMAND_MODULES dict)
-    source_detector.py       # Auto-detects source type from user input
-    create_command.py        # Unified `create` command routing
-    config_validator.py      # VALID_SOURCE_TYPES set + per-type validation
-    unified_scraper.py       # Multi-source orchestrator (scraped_data + dispatch)
-    unified_skill_builder.py # Pairwise synthesis + generic merge
-  mcp/                       # MCP server (FastMCP + legacy)
-    tools/                   # MCP tool implementations by category (10 files)
-    server_fastmcp.py        # FastMCP server implementation
-    server_legacy.py         # Legacy MCP server
-  sync/                      # Sync monitoring (Pydantic models)
-  benchmark/                 # Benchmarking framework
-  embedding/                 # FastAPI embedding server
-  workflows/                 # 67 YAML workflow presets
-  _version.py                # Reads version from pyproject.toml
-tests/                       # 160 test files (pytest)
-  test_adaptors/             # 22 adaptor-specific test files
-  conftest.py                # Test configuration with package check
-configs/                     # Preset JSON scraping configs
-docs/                        # Documentation (guides, integrations, architecture)
-```
-
-## Key Patterns
-
-**Adaptor (Strategy) pattern** — all platform logic in `cli/adaptors/`. Inherit `SkillAdaptor`, implement `format_skill_md()`, `package()`, `upload()`. Register in `adaptors/__init__.py` ADAPTORS dict.
-
-**Scraper pattern** — each source type has: `cli/<type>_scraper.py` (with `<Type>ToSkillConverter` class + `main()`), `arguments/<type>.py`, `parsers/<type>_parser.py`. Register in `parsers/__init__.py` PARSERS list, `main.py` COMMAND_MODULES dict, `config_validator.py` VALID_SOURCE_TYPES set.
-
-**Unified pipeline** — `unified_scraper.py` dispatches to per-type `_scrape_<type>()` methods. `unified_skill_builder.py` uses pairwise synthesis for docs+github+pdf combos and `_generic_merge()` for all other combinations.
-
-**MCP tools** — grouped in `mcp/tools/` by category. `scrape_generic_tool` handles all new source types.
-
-**CLI subcommands** — git-style in `cli/main.py`. Each delegates to a module's `main()` function.
-
-**Supported source types (17):** documentation (web), github, pdf, local, word, video, epub, jupyter, html, openapi, asciidoc, pptx, confluence, notion, rss, manpage, chat. Each detected automatically by `source_detector.py`.
-
-**Supported platforms (21):** claude, gemini, openai, minimax, opencode, kimi, deepseek, qwen, openrouter, together, fireworks, markdown, langchain, llama-index, haystack, weaviate, chroma, faiss, qdrant, pinecone.
-
-## CLI Commands
-
-```bash
-# Core commands
-skill-seekers create <source>              # Create skill from any source (auto-detects type)
-skill-seekers scan <dir>                   # AI-detect a project's tech stack and emit per-framework configs
-skill-seekers enhance <directory>          # AI-powered enhancement
-skill-seekers package <directory>          # Package skill for target platform
-skill-seekers upload <file>                # Upload skill to target platform
-skill-seekers install <source>             # One-command workflow (scrape + enhance + package + upload)
-
-# Utilities
-skill-seekers estimate <source>            # Estimate page count before scraping
-skill-seekers doctor                       # Health check for dependencies
-skill-seekers config                       # Configure API keys and settings
-skill-seekers workflows                    # List and apply workflow presets
-skill-seekers resume <job_id>              # Resume interrupted scraping
-
-# Advanced
-skill-seekers stream <source>              # Streaming ingestion
-skill-seekers update <directory>           # Incremental update
-skill-seekers multilang <directory>        # Multi-language support
-```
-
-## Testing Instructions
-
-### Test Structure
-- Unit tests: `tests/test_*.py` — test individual modules
-- Adaptor tests: `tests/test_adaptors/test_*_adaptor.py` — test platform adaptors
-- E2E tests: `tests/test_*_e2e.py` — end-to-end integration tests
-
-### Running Tests
-```bash
-# Fast test run (skip slow/integration tests)
-pytest tests/ -v -m "not slow and not integration"
-
-# Full test suite
-pytest tests/ -v
-
-# With coverage report
-pytest tests/ --cov=src/skill_seekers --cov-report=term-missing
-
-# Specific test categories
-pytest tests/ -v -m "slow"           # Only slow tests
-pytest tests/ -v -m "integration"    # Only integration tests
-pytest tests/ -v -m "e2e"            # Only E2E tests
-```
-
-### Test Fixtures
-Test fixtures are located in `tests/fixtures/` and include sample configs, HTML files, and mock data.
+Runs on push/PR to `main` or `development`. Lint job (ruff + mypy) + test matrix (Ubuntu + macOS, Python 3.10–3.12). Test phases: `test-fast` (unit, xdist), `test-serial` (serial/integration/E2E/network), `test-mcp` (needs `[mcp]` extras). 7 workflows total incl. release.yml (tag → PyPI via `uv build`), docker-publish.yml (amd64+arm64 CLI + MCP images), test-vector-dbs.yml, quality-metrics.yml, scheduled-updates.yml, vector-db-export.yml.
 
 ## Git Workflow
 
-- **`main`** — production, protected
-- **`development`** — default PR target, active dev
-- Feature branches created from `development`
+- **`main`** — production, protected (tests + 1 review)
+- **`development`** — default PR target (tests required)
+- Feature branches `feature/{task-id}-{description}` from `development`; PRs always target `development`, never `main` directly.
 
-## Pre-commit Checklist
+## Architecture
 
-```bash
-ruff check src/ tests/
-ruff format --check src/ tests/
-pytest tests/ -v -x   # stop on first failure
+### CLI: Unified create command
+
+Entry point `src/skill_seekers/cli/main.py`. `create` is the **primary** entry point — auto-detects source type and routes to the appropriate `SkillConverter`. `scan` (issue #327) is a separate discovery step that emits one config per detected framework; run `create` on each.
+
+```
+skill-seekers create <source>     # Auto-detect: URL, owner/repo, ./path, file.pdf, etc.
+skill-seekers scan <dir>          # AI-driven discovery → one config per framework + <project>-codebase.json
+skill-seekers package <dir>       # Package (--target claude/gemini/openai/markdown/minimax/opencode/kimi/deepseek/qwen/openrouter/together/fireworks/atlas/langchain/llama-index/haystack/chroma/faiss/weaviate/qdrant/pinecone/ibm-bob)
 ```
 
-Never commit API keys. Use env vars: `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `OPENAI_API_KEY`, `GITHUB_TOKEN`.
+Legacy-dispatch commands (see below): `enhance`, `enhance-status`, `package`, `upload`, `install` (scrape+enhance+package+upload), `install-agent`, `estimate`, `extract-test-examples`, `resume <job_id>`, `quality`, `config`, `workflows`, `sync-config`, `stream`, `update`, `multilang`.
 
-## CI/CD
+**CLI dispatch** uses the `COMMAND_CLASSES` table in `main.py`: `create`, `scan`, and `doctor` dispatch as `Cls(args).execute()` on the parsed namespace directly. The remaining commands use the legacy `COMMAND_MODULES` dispatch (module `main(args=...)` receives the parsed central namespace; the old `_reconstruct_argv` round-trip is gone); flagged for migration. `ScanCommand.execute()` is the single `asyncio.run` boundary.
 
-GitHub Actions (7 workflows in `.github/workflows/`):
-- **tests.yml** — ruff + mypy lint job, then pytest matrix (Ubuntu + macOS, Python 3.10-3.12) with Codecov upload
-- **release.yml** — tag-triggered: tests → version verification → PyPI publish via `uv build`
-- **test-vector-dbs.yml** — tests vector DB adaptors (weaviate, chroma, faiss, qdrant)
-- **docker-publish.yml** — multi-platform Docker builds (amd64, arm64) for CLI + MCP images
-- **quality-metrics.yml** — quality analysis with configurable threshold
-- **scheduled-updates.yml** — weekly skill updates for popular frameworks
-- **vector-db-export.yml** — weekly vector DB exports
+### Scan command (issue #327)
+
+Pipeline in `src/skill_seekers/cli/scan_command.py`:
+
+1. `collect_signals()` — deterministic, bounded gathering (per-kind byte budgets: 24 KB manifest / 6 KB README / 6 KB CI / 28 KB samples, 64 KB total). `_SOURCE_DIRS` covers ~14 layouts; walks root one level deep for flat-layout Python.
+2. `detect_with_ai(bundle, AgentClient)` — one LLM call, structured JSON. Source signals are first-2-KB whole-file samples (no regex parsing). Canonical-slug prompt + canonical-name resolver are coupled — change one, update the other.
+3. `resolve_or_generate_with_status()` — cache → `resolve_config_path` with canonical name candidates (handles CJK/European suffixes) → `generate_config_with_ai` last. Always appends `.json` to lookup names; always stamps `metadata.detected_version` (nested — `metadata.version` means config-schema version).
+4. `emit_codebase_config()` — always writes `<project>-codebase.json`.
+5. `diff_against_existing()` — keyed by filename slug so re-scans don't churn.
+6. `_archive_removed()` — MOVE (never delete) to `out_dir/.archived/<UTC-timestamp>/`.
+7. `maybe_publish()` — native async, opt-in registry submission; `GITHUB_TOKEN` pre-check, existing-issue idempotency guard, 0s/5s/15s retry backoff.
+
+**Cost guardrails:** `--max-ai-generations N` (default 10), `--dry-run`, `--probe-urls`. **Safety:** all writes via `_atomic_write_json`; `_safe_size` guards broken symlinks; non-zero exit when nothing emitted. **Public constant:** `SourceDetector.CODE_PROJECT_MARKERS` (~50 manifest types), shared with signal_collectors.
+
+### SkillConverter pattern (Template Method + Factory)
+
+All 18 source types implement `SkillConverter` (`skill_converter.py`): `get_converter(type, config)` factory + `converter.run()` template (`extract()` → `build_skill()`). Registry: `CONVERTER_REGISTRY`. Converters have **no `main()`** — `create_command.py` builds config from `ExecutionContext` and runs centralized enhancement. The base resolves `skill_dir` once and derives `data_file` via `data_file_for()` — subclasses must not re-derive paths.
+
+The 18: web (doc_scraper), github, pdf, word, epub, video, local (codebase_scraper), jupyter, html, openapi, asciidoc, pptx, rss, manpage, confluence, notion, chat, config (unified_scraper).
+
+### DocumentSkillBuilder (build side of the 9 document scrapers)
+
+`cli/document_skill_builder.py` sits between `SkillConverter` and the 9 document scrapers (epub, word, pptx, html, pdf, jupyter, man, rss, chat): owns `categorize_content`, reference-file writing, `index.md` + `SKILL.md` generation, `load_extracted_data`. Variation points are class attrs (`DOC_NOUN`, `SOURCE_LABEL`, …) + small hooks. Output pinned **byte-identical** by golden trees in `tests/golden/phase2/` — `UPDATE_GOLDENS=1` rewrites them, only deliberately.
+
+### UnifiedScraper (multi-source configs)
+
+`unified_scraper.py` dispatches via the class-level `SOURCE_DISPATCH` table; `_scrape_with_converter()` is the shared engine for the 13 mechanical types, so new `CONVERTER_REGISTRY` types work in the unified scrape engine automatically (unified-config validation still gates on `VALID_SOURCE_TYPES` — see Adding new features). documentation/github/local stay bespoke (commented why). `run()` deliberately does NOT follow the base template. Build side: `unified_skill_builder.py:UnifiedSkillBuilder` — pairwise synthesis for docs+github/docs+pdf-style combos, `_generic_merge()` for all other combinations.
+
+### Data flow (5 phases)
+
+1. **Scrape** → `output/{name}_data/pages/*.json` 2. **Build** → `output/{name}/SKILL.md` 3. **Enhance** (optional, `--enhance-level 0-3`) 4. **Package** (platform adaptor) 5. **Upload** (optional).
+
+### Platform adaptor pattern (Strategy + Factory)
+
+`get_adaptor(platform, config)` in `adaptors/__init__.py` → `SkillAdaptor` instance (base + `SkillMetadata` in `adaptors/base.py`; `openai_compatible.py` shared base). One module per target in `src/skill_seekers/cli/adaptors/`. All use `--target`; all imported with try/except ImportError so missing optional deps don't break the registry.
+
+### CLI argument system (single-definition parsers)
+
+`parsers/` holds the ONLY definition of each command's flags; `arguments/` holds shared defs (`common.py: add_all_standard_arguments()`, `create.py: UNIVERSAL_ARGUMENTS` etc.). Module `main(args=None)` paths build FROM the central parser class — **add/change a flag in `parsers/*.py` only**; drift-guard tests (`tests/test_cli_parsers.py`) fail CI on divergence. `ExecutionContext.override()` is context-local (ContextVar) — thread/async safe; propagate via `copy_context`.
+
+### Standalone subsystems (outside the create flow)
+
+- `embedding/` — FastAPI embedding server + cache + multi-backend generators; feeds vector-DB adaptors.
+- `sync/` — real-time doc-sync: change detection, scheduled incremental re-scrapes, email/Slack/webhook notify.
+- `benchmark/` — performance suite (timing, memory, CPU; comparison reports).
+- `workflows/` — bundled enhancement-workflow presets.
+- `cli/storage/` — cloud upload backends (S3/GCS/Azure) behind `BaseStorageAdaptor` (`storage/base_storage.py`).
+
+### C3.x codebase analysis pipeline (all opt-out via `--skip-*`)
+
+C3.1 pattern_recognizer (10 GoF patterns, 9 languages) · C3.2 test_example_extractor · C3.3 how_to_guide_builder · C3.4 config_extractor · C3.5 generate_router · C3.10 signal_flow_analyzer (Godot).
+
+### MCP server
+
+`src/skill_seekers/mcp/server_fastmcp.py` — 40 tools via FastMCP; stdio (Claude Code) or HTTP (Cursor/Windsurf). Optional dep: `pip install -e ".[mcp]"`.
+
+- **Tools run in-process** via `run_cli_main()` in `mcp/tools/_common.py` (real parser, argv patch under a lock, identical `(stdout, stderr, returncode)` contract).
+- **Exceptions BY DESIGN:** `enhance_skill` (LOCAL agent) and `install_skill`'s enhancement step stay subprocess — fork-bomb-guard env semantics (`SKILL_SEEKER_ENHANCE_ACTIVE`). Never make these in-process.
+- **Domain logic lives in `skill_seekers.services/`** — importable without `[mcp]`; old `skill_seekers.mcp.*` paths are back-compat shims.
+
+### Enhancement (AgentClient is the single AI transport)
+
+Every AI call goes through `AgentClient` (`cli/agent_client.py`): central truncation gate, timeout policy, error classification. `API_PROVIDERS` + `AGENT_PRESETS` live ONLY there. Each provider entry declares wire `protocol` (`anthropic`/`openai`/`google`) and `supports_images` — `_call_api` branches on protocol, not provider name. Multimodal via `AgentClient.call_with_image()`.
+
+- **API mode:** Anthropic, Gemini, OpenAI, Moonshot/Kimi, MiniMax — registry order; `SKILL_SEEKER_PROVIDER` forces one. Models via `SKILL_SEEKER_MODEL` or per-provider vars; `ANTHROPIC_BASE_URL` for compatible endpoints. Vision: `SKILL_SEEKER_VISION_PROVIDER`.
+- **LOCAL mode (fallback):** Claude Code, Kimi Code, Codex, Copilot, OpenCode, custom — `build_local_agent_command()`.
+- Control: `--enhance-level 0/1/2/3` · Agent: `--agent claude|codex|copilot|opencode|kimi|custom`.
+
+## Key implementation details
+
+- **Smart categorization** (`doc_scraper.py:smart_categorize()`): 3 pts URL match, 2 title, 1 content; threshold 2+; falls back to "other".
+- **Content extraction** (`doc_scraper.py`): `FALLBACK_MAIN_SELECTORS` + `_find_main_content()`; links extracted from the full page before early return; `body` deliberately excluded from fallbacks.
+- **Three-stream GitHub architecture** (`unified_codebase_analyzer.py`): code analysis / documentation / community; depth `basic` (1–2 min) or `c3x` (20–60 min).
+- **sys.modules gotcha:** `test_swift_detection.py` deletes `skill_seekers.cli` modules from `sys.modules` — must save/restore both `sys.modules` entries AND parent package attrs.
+
+## Code style (ruff, from pyproject.toml)
+
+- Line length 100; target Python 3.10+; rules E, W, F, I, B, C4, UP, ARG, SIM (ignores: E501, F541, ARG002, B007, I001, SIM114).
+- Imports: isort via ruff, `skill_seekers` first-party; guard optional imports with try/except ImportError (see `adaptors/__init__.py`).
+- Naming: `snake_case.py` files, `PascalCase` classes, `snake_case` functions, `UPPER_CASE` constants, `_` private prefix.
+- Types: gradual; modern syntax (`str | None`, `list[str]`); tests excluded from strict checking.
+- Docstrings: module-level everywhere; Google-style for public functions/classes.
+- Errors: specific exceptions, never bare `except:`; chain with `raise … from e`; clear install instructions on optional-dep failure.
+- Lint suppressions inline: `# noqa: XXXX`.
+
+## Testing
+
+Known legitimate skips (~11): chromadb×Py3.14 (2), weaviate-client absent (2), Qdrant not running (2), langchain/llama_index absent (2), GITHUB_TOKEN unset (3). Fixtures in `tests/fixtures/`.
+
+## Dependencies
+
+Core: `langchain`, `llama-index`, `anthropic`, `httpx`, `PyMuPDF`, `pydantic`. Optional extras are enumerated in pyproject.toml `[project.optional-dependencies]` (per-platform, per-source-type, cloud storage, `[mcp]`, `[all]`, `[all-llms]` — read the file rather than a hand-copied list; the old rulebooks' lists had drifted). Dev deps use PEP 735 `[dependency-groups]`.
+
+## Environment variables
+
+`ANTHROPIC_API_KEY` (+ optional `ANTHROPIC_BASE_URL`) · `GOOGLE_API_KEY` · `OPENAI_API_KEY` · `GITHUB_TOKEN`. Never commit keys; `.env` is gitignored.
+
+## Adding new features
+
+**New platform adaptor:** 1) `cli/adaptors/{platform}.py` inheriting `SkillAdaptor` 2) register in `adaptors/__init__.py` (try/except import + `ADAPTORS` dict) 3) optional dep in pyproject.toml 4) tests.
+
+**New source type converter:** 1) `cli/{type}_scraper.py` — document-shaped sources inherit `DocumentSkillBuilder`, else `SkillConverter`; set `SOURCE_TYPE` 2) register in `CONVERTER_REGISTRY` (the unified scrape engine picks it up automatically) 3) add the type to `config_validator.py:VALID_SOURCE_TYPES` — unified-config validation rejects unknown types 4) config building in `create_command.py:_build_config()` 5) auto-detection in `source_detector.py` 6) optional dep 7) tests.
+
+**New CLI argument:** central parser class (`parsers/{cmd}_parser.py`) ONLY — drift-guard fails otherwise; universal args in `arguments/create.py`; shared scraper args in `arguments/common.py`.
 
 ## Deployment
 
-### Docker
-Multi-stage Dockerfile with Python 3.12 slim base:
-```bash
-# Build CLI image
-docker build -t skill-seekers:local -f Dockerfile .
+Docker (multi-stage, Python 3.12 slim; CLI image runs non-root `skillseeker` UID 1000): `docker build -t skill-seekers:local .`; MCP image via `Dockerfile.mcp` (port 8765, non-root `mcp` user). MCP server: `skill-seekers-mcp` or `python -m skill_seekers.mcp.server_fastmcp`.
 
-# Run CLI
-docker run -v $(pwd)/output:/output skill-seekers:local create https://docs.example.com
+## Resources
 
-# Run MCP server
-docker build -t skill-seekers-mcp:local -f Dockerfile.mcp .
-docker run -p 8765:8765 skill-seekers-mcp:local
-```
-
-### MCP Server
-The MCP server provides Model Context Protocol integration:
-```bash
-# Start FastMCP server
-skill-seekers-mcp
-
-# Or use the Python module
-python -m skill_seekers.mcp.server_fastmcp
-```
-
-## Security Considerations
-
-- **API Keys:** Never commit API keys to version control. Use environment variables or `.env` files (already in `.gitignore`)
-- **Docker:** Runs as non-root user (`skillseeker`, UID 1000)
-- **Dependencies:** Regular security updates via `pip audit` or `safety check`
-- **Sandboxing:** Video processing uses optional dependencies that can be heavy; install `[video-full]` only when needed
-
-## Additional Resources
-
-- **Website:** https://skillseekersweb.com/
-- **Documentation:** https://skillseekersweb.com/
-- **PyPI:** https://pypi.org/project/skill-seekers/
-- **Repository:** https://github.com/yusufkaraaslan/Skill_Seekers
-- **Config Browser:** https://skillseekersweb.com/
-- **Project Board:** https://github.com/users/yusufkaraaslan/projects/2
+PyPI: https://pypi.org/project/skill-seekers/ · Repo: https://github.com/yusufkaraaslan/Skill_Seekers · Website/docs/config browser: https://skillseekersweb.com/ · Project board: https://github.com/users/yusufkaraaslan/projects/2

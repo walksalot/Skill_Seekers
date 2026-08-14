@@ -1457,7 +1457,7 @@ After successful setup:
 
 - **Documentation**:
   - [README.md](../README.md) - User guide
-  - [CLAUDE.md](../../CLAUDE.md) - Technical architecture
+  - [AGENTS.md](../../AGENTS.md) - Technical architecture (canonical agent rulebook)
   - [ENHANCEMENT.md](../features/ENHANCEMENT.md) - Enhancement guide
   - [UPLOAD_GUIDE.md](UPLOAD_GUIDE.md) - Upload instructions
 
