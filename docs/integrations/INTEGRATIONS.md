@@ -15,7 +15,7 @@
 | AI coding (Windsurf) | Windsurf | `--target markdown` | 5 min | [Guide](WINDSURF.md) |
 | AI coding (VS Code ext) | Cline (MCP) | `--target claude` | 10 min | [Guide](CLINE.md) |
 | AI coding (any IDE) | Continue.dev | `--target markdown` | 5 min | [Guide](CONTINUE_DEV.md) |
-| Claude AI chat | Claude | `--target claude` | 3 min | [Guide](../../CLAUDE.md) |
+| Claude AI chat | Claude | `--target claude` | 3 min | [Guide](../../AGENTS.md) |
 | Chunked for RAG | Any + chunking | `--chunk-for-rag` | + 2 min | [RAG Guide](RAG_PIPELINES.md) |
 
 ---
@@ -109,7 +109,7 @@ Upload documentation as custom skills to AI chat platforms:
 
 | Platform | Provider | Format | Best For | Guide |
 |----------|----------|--------|----------|-------|
-| **[Claude](../../CLAUDE.md)** | Anthropic | ZIP + YAML | Claude.ai Projects | [Setup →](../../CLAUDE.md) |
+| **[Claude](../../AGENTS.md)** | Anthropic | ZIP + YAML | Claude.ai Projects | [Setup →](../../AGENTS.md) |
 | **[Gemini](GEMINI_INTEGRATION.md)** | Google | tar.gz | Gemini AI | [Setup →](GEMINI_INTEGRATION.md) |
 | **[ChatGPT](OPENAI_INTEGRATION.md)** | OpenAI | ZIP + Vector Store | GPT Actions | [Setup →](OPENAI_INTEGRATION.md) |
 | **[MiniMax](MINIMAX_INTEGRATION.md)** | MiniMax | ZIP | MiniMax AI Platform | [Setup →](MINIMAX_INTEGRATION.md) |
@@ -451,7 +451,7 @@ This project uses Cursor with custom rules:
 - **[Continue.dev Integration](CONTINUE_DEV.md)** - Multi-platform, open-source
 
 ### AI Chat Platforms
-- **[Claude Integration](../../CLAUDE.md)** - Anthropic's AI assistant
+- **[Claude Integration](../../AGENTS.md)** - Anthropic's AI assistant
 - **[Gemini Integration](GEMINI_INTEGRATION.md)** - Google's AI
 - **[ChatGPT Integration](OPENAI_INTEGRATION.md)** - OpenAI
 

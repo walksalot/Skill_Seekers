@@ -325,5 +325,5 @@ skill-seekers enhance output/react/ --target openai --mode api
 - [README.md](../README.md) - Main documentation
 - [FEATURE_MATRIX.md](../reference/FEATURE_MATRIX.md) - Complete platform feature matrix
 - [MULTI_LLM_SUPPORT.md](../integrations/MULTI_LLM_SUPPORT.md) - Multi-platform guide
-- [CLAUDE.md](../../CLAUDE.md) - Architecture guide
+- [AGENTS.md](../../AGENTS.md) - Architecture guide (canonical agent rulebook)
 - [doc_scraper.py](../doc_scraper.py) - Main scraping tool
